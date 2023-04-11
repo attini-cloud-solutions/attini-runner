@@ -1,6 +1,9 @@
 package se.attini.runner;
 
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.util.List;
 import java.util.concurrent.Executors;
 import javax.inject.Inject;
 
@@ -17,6 +20,7 @@ public class Main {
         if (args.length > 0 && args[0].equals("dry-run")) {
             System.exit(0);
         }
+
         Quarkus.run(AttiniRunnerApp.class, args);
     }
 
@@ -37,6 +41,8 @@ public class Main {
         @Inject
         SfnFacade sfnFacade;
 
+        @Inject
+        EnvironmentVariables environmentVariables;
 
 
 
@@ -50,11 +56,13 @@ public class Main {
                 shutdown.shutdown();
                 logger.error("Failed performing startup tasks");
                 sfnFacade.sendTaskFailed(args[0], "Startup tasks failed", e.getMessage());
+                terminateEc2();
                 System.exit(1);
             } catch (Exception e) {
                 shutdown.shutdown();
                 logger.error("Failed performing startup tasks", e);
                 sfnFacade.sendTaskFailed(args[0], "Startup tasks failed", e.getMessage());
+                terminateEc2();
                 System.exit(1);
             }
 
@@ -71,7 +79,30 @@ public class Main {
                      });
             shutdown.scheduleShutdown();
             Quarkus.waitForExit();
+            terminateEc2();
             return 0;
+        }
+
+        private void terminateEc2() {
+            environmentVariables.getEc2InstanceId().ifPresent(s -> {
+                try {
+                    Process process = new ProcessBuilder()
+                            .redirectErrorStream(true)
+                            .inheritIO()
+                            .command(List.of(environmentVariables.getShell(),
+                                             "-c",
+                                             "aws ec2 terminate-instances --instance-ids " +s))
+                            .start();
+                    int exitCode = process.waitFor();
+                    if (exitCode != 0){
+                        logger.error("Failed to terminate ec2 instance");
+                    }
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            });
         }
     }
 }

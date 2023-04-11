@@ -1,6 +1,7 @@
 package se.attini.runner;
 
 
+import java.util.Optional;
 import javax.enterprise.context.ApplicationScoped;
 
 import org.jboss.logging.Logger;
@@ -33,6 +34,14 @@ public class EnvironmentVariables {
 
     public String getMetaDataEndpoint(){
         return System.getenv("ECS_CONTAINER_METADATA_URI_V4");
+    }
+
+    public Optional<String> getEc2InstanceId(){
+        return Optional.ofNullable(System.getenv("ATTINI_EC2_INSTANCE_ID"));
+    }
+
+    public String getShell(){
+        return System.getenv("SHELL") != null ? System.getenv("SHELL") : "/bin/bash";
     }
 
     public int getScriptTimeout(int defaultValue){

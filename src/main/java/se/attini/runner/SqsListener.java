@@ -97,7 +97,6 @@ public class SqsListener {
 
 
         if (!messages.isEmpty()) {
-            shutdown.scheduleShutdown();
             try {
                 if (!getTaskId().equals(metadata.taskId())) {
                     logger.warn("TaskId differ between attini resource and container metadata, will terminate container");

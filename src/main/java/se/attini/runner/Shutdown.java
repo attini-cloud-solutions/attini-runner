@@ -23,6 +23,7 @@ public class Shutdown {
     private final Timer timer;
     private boolean shouldExit = false;
 
+
     private CompletableFuture<Void> completableFuture = CompletableFuture.completedFuture(null);
 
     @Inject
