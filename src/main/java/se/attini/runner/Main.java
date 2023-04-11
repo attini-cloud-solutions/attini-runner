@@ -51,6 +51,7 @@ public class Main {
         public int run(String... args) {
 
             try {
+                Runtime.getRuntime().addShutdownHook(new Thread(this::terminateEc2));
                 startupService.handleStartupTask();
             } catch (ScriptExecutionException e){
                 shutdown.shutdown();
