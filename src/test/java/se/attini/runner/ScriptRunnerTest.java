@@ -32,6 +32,7 @@ class ScriptRunnerTest {
     @BeforeEach
     void setUp() {
         when(environmentVariables.getJobConcurrency()).thenReturn(1);
+        when(environmentVariables.getShell()).thenReturn( "/bin/bash");
         this.scriptRunner = new ScriptRunner(s3Loggers, environmentVariables);
     }
 

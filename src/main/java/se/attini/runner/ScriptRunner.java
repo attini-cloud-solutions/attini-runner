@@ -24,11 +24,13 @@ public class ScriptRunner {
     private final S3Logger s3Logger;
 
     private final ExecutorService executorService;
+    private final EnvironmentVariables environmentVariables;
 
     @Inject
     public ScriptRunner(S3Logger s3Logger,
                         EnvironmentVariables environmentVariables) {
         this.s3Logger = requireNonNull(s3Logger, "s3Logger");
+        this.environmentVariables = requireNonNull(environmentVariables, "environmentVariables");
         this.executorService = Executors.newFixedThreadPool(environmentVariables.getJobConcurrency());
     }
 
@@ -43,14 +45,13 @@ public class ScriptRunner {
 
             logger.debug("execution timeout is set to = " + scriptTimeout);
 
-            String shell = System.getenv("SHELL") != null ? System.getenv("SHELL") : "/bin/bash";
 
             String fileCommand = "chmod +x " + path.toString() + "; " + path;
 
             Process process = new ProcessBuilder()
                     .redirectErrorStream(true)
                     .redirectInput(ProcessBuilder.Redirect.INHERIT)
-                    .command(List.of(shell,
+                    .command(List.of(environmentVariables.getShell(),
                                      "-c",
                                      fileCommand))
                     .start();
