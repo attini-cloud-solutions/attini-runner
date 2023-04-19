@@ -4,6 +4,7 @@ package se.attini.runner;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import javax.inject.Inject;
 
@@ -12,6 +13,9 @@ import org.jboss.logging.Logger;
 import io.quarkus.runtime.Quarkus;
 import io.quarkus.runtime.QuarkusApplication;
 import io.quarkus.runtime.annotations.QuarkusMain;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
 
 @QuarkusMain
 public class Main {
@@ -84,26 +88,52 @@ public class Main {
                                 .ifPresent(s -> {
                                     logger.info("Registered shutdown hook for terminating ec2 instance");
                                     Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                                        System.out.println("Terminating ec2 instance");
-                                        try {
-                                            Process process = new ProcessBuilder()
-                                                    .redirectErrorStream(true)
-                                                    .inheritIO()
-                                                    .command(List.of(environmentVariables.getShell(),
-                                                                     "-c",
-                                                                     "aws ec2 terminate-instances --instance-ids " + s))
-                                                    .start();
-                                            int exitCode = process.waitFor();
-                                            if (exitCode != 0) {
-                                                System.err.println("Failed to terminate ec2 instance");
+                                        if (shutdownHookEnabled()) {
+                                            System.out.println("Shutdown hook enabled. Terminating ec2 instance");
+                                            try {
+                                                Process process = new ProcessBuilder()
+                                                        .redirectErrorStream(true)
+                                                        .inheritIO()
+                                                        .command(List.of(environmentVariables.getShell(),
+                                                                         "-c",
+                                                                         "aws ec2 terminate-instances --instance-ids " + s))
+                                                        .start();
+                                                int exitCode = process.waitFor();
+                                                if (exitCode != 0) {
+                                                    System.err.println("Failed to terminate ec2 instance");
+                                                }
+                                            } catch (IOException e) {
+                                                throw new UncheckedIOException(e);
+                                            } catch (InterruptedException e) {
+                                                throw new RuntimeException(e);
                                             }
-                                        } catch (IOException e) {
-                                            throw new UncheckedIOException(e);
-                                        } catch (InterruptedException e) {
-                                            throw new RuntimeException(e);
+                                        } else {
+                                            System.out.println(
+                                                    "Shutdown hook is disabled. Will leave EC2 instance running.");
                                         }
                                     }));
                                 });
+        }
+
+        private boolean shutdownHookEnabled() {
+            try (DynamoDbClient dbClient = DynamoDbClient.create()) {
+                return !dbClient.getItem(GetItemRequest.builder()
+                                                       .consistentRead(true)
+                                                       .tableName(environmentVariables.getResourceStatesTable())
+                                                       .key(Map.of("resourceType",
+                                                                   AttributeValue.builder()
+                                                                                 .s("Runner")
+                                                                                 .build(),
+                                                                   "name",
+                                                                   AttributeValue.builder()
+                                                                                 .s(environmentVariables.getRunnerResourceName())
+                                                                                 .build()))
+                                                       .build()).item().get("shutdownHookDisabled").bool();
+            } catch (Exception e) {
+                System.err.println("Error when reading shutdown hook, will treat as enabled. Error: " + e.getMessage());
+                e.printStackTrace();
+                return true;
+            }
         }
     }
 }
