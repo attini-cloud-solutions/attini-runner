@@ -36,6 +36,10 @@ public class EnvironmentVariables {
         return System.getenv("ECS_CONTAINER_METADATA_URI_V4");
     }
 
+    public String getRegion(){
+        return System.getenv("ATTINI_AWS_REGION");
+    }
+
     public Optional<String> getEc2InstanceId(){
         return Optional.ofNullable(System.getenv("ATTINI_EC2_INSTANCE_ID"));
     }
@@ -102,4 +106,7 @@ public class EnvironmentVariables {
         }
     }
 
+    public String getAccountId() {
+        return System.getenv("ATTINI_AWS_ACCOUNT");
+    }
 }

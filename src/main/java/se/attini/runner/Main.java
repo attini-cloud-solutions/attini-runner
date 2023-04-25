@@ -1,9 +1,6 @@
 package se.attini.runner;
 
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import javax.inject.Inject;
@@ -13,6 +10,7 @@ import org.jboss.logging.Logger;
 import io.quarkus.runtime.Quarkus;
 import io.quarkus.runtime.QuarkusApplication;
 import io.quarkus.runtime.annotations.QuarkusMain;
+import se.attini.runner.registercdkstack.RegisterCdkStackApp;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
@@ -25,9 +23,22 @@ public class Main {
             System.exit(0);
         }
 
-        Quarkus.run(AttiniRunnerApp.class, args);
-    }
+        if (args.length > 0 && args[0].equals("register-cdk-stacks")) {
+            System.setProperty("quarkus.log.file.enable","true");
+            System.setProperty("quarkus.log.console.enable","false");
+            System.setProperty("quarkus.log.file.path", "attini-runner-commands.log");
+            Quarkus.run(RegisterCdkStackApp.class, args);
+            System.exit(0);
+        }
 
+        if (args.length == 0){
+            Quarkus.run(AttiniRunnerApp.class, args);
+        }
+
+        System.err.println("Invalid number of arguments");
+        System.exit(1);
+
+    }
     public static class AttiniRunnerApp implements QuarkusApplication {
 
         private static final Logger logger = Logger.getLogger(AttiniRunnerApp.class);
@@ -67,7 +78,6 @@ public class Main {
                 System.exit(1);
             }
 
-
             Executors.newSingleThreadExecutor(r -> new Thread(r, "sqs-listener-thread"))
                      .submit(() -> {
                          while (!shutdown.shouldExit()) {
@@ -85,28 +95,11 @@ public class Main {
 
         private void addEc2ShutdownHook() {
             environmentVariables.getEc2InstanceId()
-                                .ifPresent(s -> {
+                                .ifPresent(instanceId -> {
                                     logger.info("Registered shutdown hook for terminating ec2 instance");
                                     Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                                        if (shutdownHookEnabled()) {
-                                            System.out.println("Shutdown hook enabled. Terminating ec2 instance");
-                                            try {
-                                                Process process = new ProcessBuilder()
-                                                        .redirectErrorStream(true)
-                                                        .inheritIO()
-                                                        .command(List.of(environmentVariables.getShell(),
-                                                                         "-c",
-                                                                         "aws ec2 terminate-instances --instance-ids " + s))
-                                                        .start();
-                                                int exitCode = process.waitFor();
-                                                if (exitCode != 0) {
-                                                    System.err.println("Failed to terminate ec2 instance");
-                                                }
-                                            } catch (IOException e) {
-                                                throw new UncheckedIOException(e);
-                                            } catch (InterruptedException e) {
-                                                throw new RuntimeException(e);
-                                            }
+                                        if (ec2ShutdownHookEnabled()) {
+                                            AwsEc2ApiFacade.terminateEc2Instance(instanceId);
                                         } else {
                                             System.out.println(
                                                     "Shutdown hook is disabled. Will leave EC2 instance running.");
@@ -115,7 +108,7 @@ public class Main {
                                 });
         }
 
-        private boolean shutdownHookEnabled() {
+        private boolean ec2ShutdownHookEnabled() {
             try (DynamoDbClient dbClient = DynamoDbClient.create()) {
                 return !dbClient.getItem(GetItemRequest.builder()
                                                        .consistentRead(true)
