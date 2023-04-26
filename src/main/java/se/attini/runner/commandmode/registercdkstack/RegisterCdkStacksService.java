@@ -1,4 +1,4 @@
-package se.attini.runner.registercdkstack;
+package se.attini.runner.commandmode.registercdkstack;
 
 import static java.util.Objects.requireNonNull;
 

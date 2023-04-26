@@ -1,4 +1,4 @@
-package se.attini.runner.registercdkstack;
+package se.attini.runner.commandmode.registercdkstack;
 
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
