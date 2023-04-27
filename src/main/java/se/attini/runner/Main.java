@@ -1,18 +1,18 @@
 package se.attini.runner;
 
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import javax.inject.Inject;
 
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
+import com.fasterxml.jackson.core.Version;
 
 import io.quarkus.runtime.Quarkus;
 import io.quarkus.runtime.QuarkusApplication;
 import io.quarkus.runtime.annotations.QuarkusMain;
+import se.attini.runner.commandmode.CommandModeApp;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
@@ -21,10 +21,18 @@ import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
 public class Main {
 
     public static void main(String[] args) {
+
         if (args.length > 0 && args[0].equals("dry-run")) {
             System.exit(0);
         }
 
+        if (args.length > 0 && args[0].equals("command-mode")) {
+            System.setProperty("quarkus.log.file.enable", "true");
+            System.setProperty("quarkus.log.console.enable", "false");
+            System.setProperty("quarkus.log.file.path", CommandModeApp.LOG_FILE);
+            Quarkus.run(CommandModeApp.class, args);
+            System.exit(0);
+        }
         Quarkus.run(AttiniRunnerApp.class, args);
     }
 
@@ -48,9 +56,27 @@ public class Main {
         @Inject
         EnvironmentVariables environmentVariables;
 
+        @ConfigProperty(name = "quarkus.application.version")
+        String version;
+
 
         @Override
         public int run(String... args) {
+
+            if (args.length == 2) {
+                Version requiredVersion = toVersion(args[1]);
+                Version currentVersion = toVersion(version);
+
+                if (requiredVersion.compareTo(currentVersion) > 0) {
+                    String errorMessage = "The current runner version is older then the required version. Required version: " + args[1] + ", current version: " + version;
+                    logger.error(errorMessage);
+                    sfnFacade.sendTaskFailed(args[0],
+                                             "Startup tasks failed",
+                                             errorMessage);
+                   return 1;
+                }
+
+            }
 
             try {
                 addEc2ShutdownHook();
@@ -59,14 +85,13 @@ public class Main {
                 shutdown.shutdown();
                 logger.error("Failed performing startup tasks");
                 sfnFacade.sendTaskFailed(args[0], "Startup tasks failed", e.getMessage());
-                System.exit(1);
+                return 1;
             } catch (Exception e) {
                 shutdown.shutdown();
                 logger.error("Failed performing startup tasks", e);
                 sfnFacade.sendTaskFailed(args[0], "Startup tasks failed", e.getMessage());
-                System.exit(1);
+               return 1;
             }
-
 
             Executors.newSingleThreadExecutor(r -> new Thread(r, "sqs-listener-thread"))
                      .submit(() -> {
@@ -83,30 +108,26 @@ public class Main {
             return 0;
         }
 
+        private static Version toVersion(String versionString) {
+            if (versionString.contains("-")) {
+                versionString = versionString.substring(0,versionString.indexOf("-"));
+            }
+            String[] splitVersion = versionString.split("\\.");
+            return new Version(Integer.parseInt(splitVersion[0]),
+                               Integer.parseInt(splitVersion[1]),
+                               Integer.parseInt(splitVersion[2]),
+                               null,
+                               null,
+                               null);
+        }
+
         private void addEc2ShutdownHook() {
             environmentVariables.getEc2InstanceId()
-                                .ifPresent(s -> {
+                                .ifPresent(instanceId -> {
                                     logger.info("Registered shutdown hook for terminating ec2 instance");
                                     Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                                        if (shutdownHookEnabled()) {
-                                            System.out.println("Shutdown hook enabled. Terminating ec2 instance");
-                                            try {
-                                                Process process = new ProcessBuilder()
-                                                        .redirectErrorStream(true)
-                                                        .inheritIO()
-                                                        .command(List.of(environmentVariables.getShell(),
-                                                                         "-c",
-                                                                         "aws ec2 terminate-instances --instance-ids " + s))
-                                                        .start();
-                                                int exitCode = process.waitFor();
-                                                if (exitCode != 0) {
-                                                    System.err.println("Failed to terminate ec2 instance");
-                                                }
-                                            } catch (IOException e) {
-                                                throw new UncheckedIOException(e);
-                                            } catch (InterruptedException e) {
-                                                throw new RuntimeException(e);
-                                            }
+                                        if (ec2ShutdownHookEnabled()) {
+                                            AwsEc2ApiFacade.terminateEc2Instance(instanceId);
                                         } else {
                                             System.out.println(
                                                     "Shutdown hook is disabled. Will leave EC2 instance running.");
@@ -115,7 +136,7 @@ public class Main {
                                 });
         }
 
-        private boolean shutdownHookEnabled() {
+        private boolean ec2ShutdownHookEnabled() {
             try (DynamoDbClient dbClient = DynamoDbClient.create()) {
                 return !dbClient.getItem(GetItemRequest.builder()
                                                        .consistentRead(true)
@@ -130,7 +151,7 @@ public class Main {
                                                                                  .build()))
                                                        .build()).item().get("shutdownHookDisabled").bool();
             } catch (Exception e) {
-                System.err.println("Error when reading shutdown hook, will treat as enabled. Error: " + e.getMessage());
+                System.err.println("Error when reading shutdown hook toggle, will treat as enabled. Error: " + e.getMessage());
                 e.printStackTrace();
                 return true;
             }

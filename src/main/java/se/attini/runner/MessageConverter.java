@@ -46,7 +46,8 @@ public class MessageConverter {
 
             HashMap<String, String> envVariables = new HashMap<>();
             jsonNode.path("Properties")
-                    .path("Environment").fields()
+                    .path("Environment")
+                    .fields()
                     .forEachRemaining(stringJsonNodeEntry -> envVariables.put(stringJsonNodeEntry.getKey(),
                                                                               stringJsonNodeEntry.getValue()
                                                                                                  .asText()));
