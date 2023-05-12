@@ -35,8 +35,6 @@ public class JobCreator {
             fileWriter.newLine();
             fileWriter.write("export ATTINI_DISTRIBUTION_ID='" + jobData.distributionId()+"'");
             fileWriter.newLine();
-            fileWriter.write("export ATTINI_ARTIFACT_STORE='" + jobData.sourceBucket()+"'");
-            fileWriter.newLine();
             fileWriter.write("export ATTINI_DISTRIBUTION_ARTIFACTS_PREFIX='" + jobData.sourcePrefix()+"'");
             fileWriter.newLine();
             fileWriter.write("export ATTINI_INPUT='" + inputFile+"'");
