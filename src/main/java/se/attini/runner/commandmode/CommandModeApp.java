@@ -21,6 +21,9 @@ public class CommandModeApp implements QuarkusApplication {
     @Inject
     RegisterCdkStacksService registerCdkStacksService;
 
+    @Inject
+    ArtifactStoreFacade artifactStoreFacade;
+
     @ConfigProperty(name = "quarkus.application.version")
     String version;
 
@@ -41,6 +44,19 @@ public class CommandModeApp implements QuarkusApplication {
                     e.printStackTrace();
                     yield 1;
                 }
+            }
+            case "store-artifact" ->{
+                try {
+                    System.out.println("Storing "+args[3] +" in artifact store.");
+                    artifactStoreFacade.store(args[2], args[3]);
+                    yield 0;
+                } catch (Exception e){
+                    System.err.println("Encountered errored, printing logs to error stream");
+                    printLogs();
+                    e.printStackTrace();
+                    yield 1;
+                }
+
             }
            default -> {
                System.err.println("Unknown arguments: " + Arrays.toString(args));

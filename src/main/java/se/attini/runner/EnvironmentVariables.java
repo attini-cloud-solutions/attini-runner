@@ -40,6 +40,10 @@ public class EnvironmentVariables {
         return System.getenv("ATTINI_AWS_REGION");
     }
 
+    public String getArtifactStoreBucketName(){
+        return System.getenv("ATTINI_ARTIFACT_STORE");
+    }
+
     public Optional<String> getEc2InstanceId(){
         return Optional.ofNullable(System.getenv("ATTINI_EC2_INSTANCE_ID"));
     }
