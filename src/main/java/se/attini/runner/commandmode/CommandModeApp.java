@@ -6,7 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.stream.Stream;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
@@ -36,7 +36,29 @@ public class CommandModeApp implements QuarkusApplication {
             }
             case "register-cdk-stacks" -> {
                 try {
-                    System.out.println(registerCdkStacksService.registerStacks(args[2]));
+                    registerCdkStacksService.registerStacksDeprecated(args[2]);
+                    yield 0;
+                } catch (Exception e) {
+                    System.err.println("Encountered errored, printing logs to error stream");
+                    printLogs();
+                    e.printStackTrace();
+                    yield 1;
+                }
+            }
+            case "save-cdk-stacks" -> {
+                try {
+                    registerCdkStacksService.registerStacks(args[2]);
+                    yield 0;
+                } catch (Exception e) {
+                    System.err.println("Encountered errored, printing logs to error stream");
+                    printLogs();
+                    e.printStackTrace();
+                    yield 1;
+                }
+            }
+            case "format-cdk-output" -> {
+                try {
+                    System.out.println(registerCdkStacksService.formatOutput(args[2]));
                     yield 0;
                 } catch (Exception e) {
                     System.err.println("Encountered errored, printing logs to error stream");

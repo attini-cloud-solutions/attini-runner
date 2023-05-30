@@ -10,8 +10,8 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.time.Duration;
-import javax.enterprise.context.ApplicationScoped;
-import javax.inject.Qualifier;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Qualifier;
 
 import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
 import software.amazon.awssdk.core.retry.RetryMode;

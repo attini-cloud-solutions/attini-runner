@@ -34,6 +34,8 @@ public class AwsEc2ApiFacade {
      */
     public static void terminateEc2Instance(String instanceId) {
 
+        System.out.println("terminating ec2 instance with instanceId: " + instanceId);
+
         Map<String, List<String>> parameters = Map.of("Action",
                                                       List.of("TerminateInstances"),
                                                       "Version",

@@ -3,7 +3,7 @@ package se.attini.runner.commandmode;
 import static java.util.Objects.requireNonNull;
 
 import java.nio.file.Path;
-import javax.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.context.ApplicationScoped;
 
 import se.attini.runner.BeanFactory;
 import se.attini.runner.EnvironmentVariables;

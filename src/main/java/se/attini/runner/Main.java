@@ -3,7 +3,7 @@ package se.attini.runner;
 
 import java.util.Map;
 import java.util.concurrent.Executors;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
