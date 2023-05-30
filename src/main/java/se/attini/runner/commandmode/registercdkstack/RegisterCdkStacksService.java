@@ -6,8 +6,8 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import javax.enterprise.context.ApplicationScoped;
-import javax.inject.Inject;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 
 import org.jboss.logging.Logger;
 
@@ -47,7 +47,72 @@ public class RegisterCdkStacksService {
         this.dynamoDbClient = requireNonNull(dynamoDbClient, "dynamoDbClient");
     }
 
-    public JsonNode registerStacks(String request) {
+    public void registerStacks(String request) {
+
+        logger.info("Processing cdk stack event: " + request);
+        RegisterCdkStacksEvent event = createEvent(request);
+
+
+        event.stacks()
+             .stream()
+             .map(cdkStack -> {
+                 CdkEnvironment environment = cdkStack.environment();
+                 String region = isUnknown(environment.region()) ? environmentVariables.getRegion() : environment.region();
+                 String account = isUnknown(environment.account()) ? environmentVariables.getAccountId() : environment.account();
+                 return new CdkStack(cdkStack.name(), cdkStack.id(), new CdkEnvironment(region, account));
+             })
+             .forEach(cdkStack -> saveCdkStack(event, event.stepName(), cdkStack));
+
+    }
+
+    public JsonNode formatOutput(String request) {
+
+        logger.info("Formatting output for cdk stack event: " + request);
+        RegisterCdkStacksEvent event = createEvent(request);
+
+
+        return objectMapper.valueToTree(event.stacks()
+                                             .stream()
+                                             .collect(Collectors.toMap(CdkStack::id, cdkStack -> {
+
+                                                 long nrOfStacksWithName = event.stacks()
+                                                                                .stream()
+                                                                                .filter(cdkStack1 -> cdkStack1.name().equals(cdkStack.name()))
+                                                                                .count();
+                                                 if (nrOfStacksWithName > 1) {
+                                                     return "Could not resolve stack output, multiple stacks with same name detected in app";
+                                                 }
+                                                 return event.outputs().getOrDefault(cdkStack.name(), Collections.emptyMap());
+                                             })));
+    }
+    public void saveCdkStack(RegisterCdkStacksEvent event, String stepName, CdkStack cdkStack) {
+        dynamoDbClient.putItem(PutItemRequest.builder()
+                                             .tableName(environmentVariables.getResourceStatesTable())
+                                             .item(Map.of("resourceType",
+                                                          stringAttribute("CloudformationStack"),
+                                                          "name",
+                                                          stringAttribute("%s-%s-%s".formatted(cdkStack.name(),
+                                                                                               cdkStack.environment()
+                                                                                                       .region(),
+                                                                                               cdkStack.environment()
+                                                                                                       .account())),
+                                                          STEP_NAME,
+                                                          stringAttribute(stepName),
+                                                          DISTRIBUTION_NAME,
+                                                          stringAttribute(event.distributionName()),
+                                                          DISTRIBUTION_ID,
+                                                          stringAttribute(event.distributionId()),
+                                                          OBJECT_IDENTIFIER,
+                                                          stringAttribute(event.objectIdentifier()),
+                                                          ENVIRONMENT,
+                                                          stringAttribute(event.environment()),
+                                                          "stackType", stringAttribute("Cdk")
+                                             )).build());
+    }
+
+    @Deprecated
+    //User by older versions of the Attini framework, to be removed.
+    public JsonNode registerStacksDeprecated(String request) {
 
         logger.info("Processing cdk stack event: " + request);
         RegisterCdkStacksEvent event = createEvent(request);
@@ -64,41 +129,18 @@ public class RegisterCdkStacksService {
              .forEach(cdkStack -> saveCdkStack(event, event.stepName(), cdkStack));
 
         return objectMapper.valueToTree(event.stacks()
-                                       .stream()
-                                       .collect(Collectors.toMap(CdkStack::id, cdkStack -> {
+                                             .stream()
+                                             .collect(Collectors.toMap(CdkStack::id, cdkStack -> {
 
-                                           long nrOfStacksWithName = event.stacks()
-                                                                          .stream()
-                                                                          .filter(cdkStack1 -> cdkStack1.name().equals(cdkStack.name()))
-                                                                          .count();
-                                           if (nrOfStacksWithName > 1) {
-                                               return "Could not resolve stack output, multiple stacks with same name detected in app";
-                                           }
-                                           return event.outputs().getOrDefault(cdkStack.name(), Collections.emptyMap());
-                                       })));
-    }
-    public void saveCdkStack(RegisterCdkStacksEvent event, String stepName, CdkStack cdkStack) {
-        dynamoDbClient.putItem(PutItemRequest.builder()
-                                             .tableName(environmentVariables.getResourceStatesTable())
-                                             .item(Map.of("resourceType",
-                                                          stringAttribute("CdkStack"),
-                                                          "name",
-                                                          stringAttribute("%s-%s-%s".formatted(cdkStack.name(),
-                                                                                               cdkStack.environment()
-                                                                                                       .region(),
-                                                                                               cdkStack.environment()
-                                                                                                       .account())),
-                                                          STEP_NAME,
-                                                          stringAttribute(stepName),
-                                                          DISTRIBUTION_NAME,
-                                                          stringAttribute(event.distributionName()),
-                                                          DISTRIBUTION_ID,
-                                                          stringAttribute(event.distributionId()),
-                                                          OBJECT_IDENTIFIER,
-                                                          stringAttribute(event.objectIdentifier()),
-                                                          ENVIRONMENT,
-                                                          stringAttribute(event.environment())
-                                             )).build());
+                                                 long nrOfStacksWithName = event.stacks()
+                                                                                .stream()
+                                                                                .filter(cdkStack1 -> cdkStack1.name().equals(cdkStack.name()))
+                                                                                .count();
+                                                 if (nrOfStacksWithName > 1) {
+                                                     return "Could not resolve stack output, multiple stacks with same name detected in app";
+                                                 }
+                                                 return event.outputs().getOrDefault(cdkStack.name(), Collections.emptyMap());
+                                             })));
     }
 
     private static AttributeValue stringAttribute(String value) {
