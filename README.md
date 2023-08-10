@@ -4,7 +4,7 @@ The Attini runner is a small java app built with the [Quarkus framework](https:/
 Its purpose is to execute shell commands for the Attini Frameworks AttiniRunnerJob step.
 It is also used by other steps, such as the AttiniCdk and AttiniSam step. 
 For more information about the runner, 
-visit the [documentation](https://docs.attini.io/api-reference/attini-runner.html).
+visit the [documentation](https://docs.attini.io/api-reference/attini-runner).
 
 ## Building the Runner
 The Runner is meant to be compiled in to a native image using GraalVM.
@@ -29,4 +29,4 @@ When installing the runner on your own image, make sure to keep the name ```atti
 will install a new version. The framework will start the app, so it only needs to be installed.
 
 For more information about using your own image,
-please visit the [Runner documentation](https://docs.attini.io/api-reference/attini-runner.html).
+please visit the [Runner documentation](https://docs.attini.io/api-reference/attini-runner).
